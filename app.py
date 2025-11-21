@@ -17,10 +17,10 @@ with col_config1:
 
 with col_config2:
     st.write("### 🎯 Selecciona el formato:")
-    check_linkedin = st.checkbox("Generar Post de LinkedIn", value=True)
-    check_twitter = st.checkbox("Generar Hilo de Twitter", value=True)
+    check_linkedin = st.checkbox("Generar post de LinkedIn", value=True)
+    check_twitter = st.checkbox("Generar hilo de Twitter", value=True)
 
-if st.button("✨ Generar Contenido fusionado"):
+if st.button("✨ Generar contenido fusionado"):
     if not urls_input:
         st.error("❌ Por favor, ingresa al menos una URL válida.")
         st.stop()
