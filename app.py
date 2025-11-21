@@ -4,7 +4,7 @@ import backend.generator as generator
 import os
 
 st.set_page_config(page_title="Multi-Video Repurposer", page_icon="🤖", layout="wide")
-st.title("🤖 AI Content Repurposer")
+st.title("🤖 AI Multi-Video Repurposer")
 st.markdown("""
 Convierte uno o varios videos de **YouTube** en posts virales para **LinkedIn** y **Twitter** en segundos.
 Powered by **Groq, Whisper & Llama 3**.
