@@ -210,9 +210,19 @@ __marimo__/
 # Ignorar carpetas de cache de Python
 __pycache__/
 
-# Ignorar archivos de audio descargados
-*.m4a
-*.mp3
+# Ignorar archivos de sistema y entorno
+__pycache__/
+.env
+.DS_Store
 
-# Ignorar archivos generados
-resultado_*.md
+# Ignorar archivos dentro de temp/ pero mantener la carpeta
+temp/*
+!temp/.gitkeep
+
+# Ignorar archivos dentro de outputs/ pero mantener la carpeta
+outputs/*
+!outputs/.gitkeep
+
+# Ignorar audios sueltos por si acaso
+*.mp3
+*.m4a

@@ -4,11 +4,16 @@ from yt_dlp import YoutubeDL
 
 def download_audio_with_groq(url, index):
     
-    desired_filename = f"audio_temp_{index}"
+    folder = "temp"
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+    
+    filename = f"audio_temp_{index}"
+    filepath = os.path.join(folder, filename)
     
     ydl_opts = {
         "format": "worstaudio",
-        "outtmpl": f"{desired_filename}.%(ext)s",
+        "outtmpl": f"{filepath}.%(ext)s",
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "m4a",
@@ -19,7 +24,7 @@ def download_audio_with_groq(url, index):
     with YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 
-    return f"{desired_filename}.m4a"
+    return f"{filepath}.m4a"
 
 
 def transcribe_with_groq(audio_file):

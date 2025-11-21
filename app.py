@@ -1,6 +1,6 @@
 import streamlit as st
-import transcriber
-import generator
+import backend.transcriber as transcriber
+import backend.generator as generator
 import os
 
 st.set_page_config(page_title="Multi-Video Repurposer", page_icon="🤖", layout="wide")

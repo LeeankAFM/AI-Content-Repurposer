@@ -1,7 +1,7 @@
 from yt_dlp import YoutubeDL
 from groq import Groq
 import os
-import transcriber, generator
+import backend.transcriber as transcriber, backend.generator as generator
 
 def main():
     
