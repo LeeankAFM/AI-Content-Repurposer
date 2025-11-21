@@ -16,7 +16,7 @@ def generate_content(transcription, platforms):
         
         prompt = ""
         
-        if format == "linkedin":
+        if platform == "linkedin":
             prompt = f"""
             Crea un post profesional para LinkedIn basado en la siguiente transcripción.
             Reglas:
@@ -29,7 +29,7 @@ def generate_content(transcription, platforms):
             Transcripción:
             {transcription}
             """
-        elif format == "twitter":
+        elif platform == "twitter":
             prompt = f"""
             Crea un hilo de Twitter (X) basado en esta transcripción.
             Reglas:

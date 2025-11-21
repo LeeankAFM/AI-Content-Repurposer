@@ -58,33 +58,41 @@ if st.button("✨ Generar contenido fusionado"):
         
         bar.progress(60)    
         
-        content = generator.generate_content(full_transcription[:25000])
+        content = generator.generate_content(full_transcription[:25000], selected_platforms)
         
         bar.progress(100)
         
         status_text.text("✅ ¡Contenido Generado!")
         
-        col1, col2 = st.columns(2)
+        if 'linkedin' in content and 'twitter' in content:
+            col1, col2 = st.columns(2)
+        else:
+            col1 = st.container()
+            col2 = st.container()
 
-        with col1:
-            st.subheader("🟦 LinkedIn Post")
-            st.markdown(content['linkedin'])
-            st.download_button(
-                label="📥 Descargar Markdown LinkedIn",
-                data=content['linkedin'],
-                file_name="post_linkedin.md",
-                mime="text/markdown"
-            )
+        if 'linkedin' in content:
+            with col1:
+                st.subheader("🟦 LinkedIn Post")
+                st.markdown(content['linkedin'])
+                st.download_button(
+                    label="📥 Descargar Markdown LinkedIn",
+                    data=content['linkedin'],
+                    file_name="post_linkedin.md",
+                    mime="text/markdown"
+                )
 
-        with col2:
-            st.subheader("🐦 Twitter Thread")
-            st.markdown(content['twitter'])
-            st.download_button(
-                label="📥 Descargar Markdown Twitter",
-                data=content['twitter'],
-                file_name="hilo_twitter.md",
-                mime="text/markdown"
-            )
+        if 'twitter' in content:
+            # Si no hay linkedin, Twitter usa el espacio de col1 o col2 según corresponda
+            target_col = col2 if 'linkedin' in content else col1
+            with target_col:
+                st.subheader("🐦 Twitter Thread")
+                st.markdown(content['twitter'])
+                st.download_button(
+                    label="📥 Descargar Markdown Twitter",
+                    data=content['twitter'],
+                    file_name="hilo_twitter.md",
+                    mime="text/markdown"
+                )
 
         with st.expander("Ver Transcripción Combinada Completa"):
             st.write(full_transcription)
