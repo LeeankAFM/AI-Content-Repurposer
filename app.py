@@ -17,7 +17,6 @@ with col_config1:
 
 with col_config2:
     st.write("### 🎯 Selecciona el formato:")
-    # LOS CHULITOS (Checkboxes)
     check_linkedin = st.checkbox("Generar Post de LinkedIn", value=True)
     check_twitter = st.checkbox("Generar Hilo de Twitter", value=True)
 
