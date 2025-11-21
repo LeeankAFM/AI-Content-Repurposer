@@ -2,17 +2,17 @@ import os
 from groq import Groq
 from yt_dlp import YoutubeDL
 
-def download_audio_with_groq(url):
+def download_audio_with_groq(url, index):
     
-    desired_filename = "mi_audio_para_transcribir"
+    desired_filename = f"audio_temp_{index}"
     
     ydl_opts = {
         "format": "worstaudio",
         "outtmpl": f"{desired_filename}.%(ext)s",
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
-            "preferredcodec": "aac",
-            "preferredquality": "32",
+            "preferredcodec": "m4a",
+            "preferredquality": "16",
         }],
     }
 
@@ -40,11 +40,16 @@ def transcribe_with_groq(audio_file):
             response_format="text",
             language="es"
         )
+        
+    try:
+        os.remove(audio_file)
+    except:
+        pass
     
     return result
 
-def transcribe_url(url):
-    audio_file = download_audio_with_groq(url)
-    print(f"✅ Audio descargado correctamente: {audio_file}")
+def transcribe_url(url, index=0):
+    audio_file = download_audio_with_groq(url, index)
+    print(f"✅ Audio {index} descargado correctamente: {audio_file}")
     transcription = transcribe_with_groq(audio_file)
     return transcription

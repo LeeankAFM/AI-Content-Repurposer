@@ -1,18 +1,18 @@
 from groq import Groq
 import os
 
-# Inicializa el cliente (igual que antes)
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 system_prompt = "Eres un experto en creación de contenido viral y marketing digital. Tu objetivo es transformar transcripciones de video en piezas de contenido de alto impacto."
 
-def generate_content(transcription):
-    
-    format_type = ["twitter"]
+def generate_content(transcription, platforms):
     
     results = {}
-    for format in format_type:
+    
+    print(f"--- Iniciando generación para: {platforms} ---")
+    
+    for platform in platforms:
         
-        print(f" > Procesando: {format}...") # Debug para saber que entró al bucle
+        print(f" > Procesando: {platform}...")
         
         prompt = ""
         
@@ -41,7 +41,6 @@ def generate_content(transcription):
             {transcription}
             """
         if not prompt:
-            print(f"⚠️ Error: No se definió prompt para {format}")
             continue
            
         try: 
@@ -51,15 +50,15 @@ def generate_content(transcription):
                 {"role": "user", "content": prompt}
             ],
             model="llama-3.3-70b-versatile",
-            temperature=0.7 # Creatividad media
+            temperature=0.7
             )  
             
             contenido_generado = response.choices[0].message.content
-            results[format] = contenido_generado
-            print(f" ✅ {format} generado con éxito.")
+            results[platform] = contenido_generado
+            print(f" ✅ {platform} generado con éxito.")
             
         except Exception as e:
-            print(f" ❌ Error generando {format}: {e}")
-            results[format] = "Error al generar contenido."
+            print(f" ❌ Error generando {platform}: {e}")
+            results[platform] = "Error al generar contenido."
         
     return results

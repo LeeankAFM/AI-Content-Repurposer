@@ -3,72 +3,92 @@ import transcriber
 import generator
 import os
 
-# 1. Configuración de la página (Título e icono)
-st.set_page_config(page_title="AI Content Repurposer", page_icon="🤖", layout="wide")
-
-# 2. Título y Descripción
+st.set_page_config(page_title="Multi-Video Repurposer", page_icon="🤖", layout="wide")
 st.title("🤖 AI Content Repurposer")
 st.markdown("""
-Convierte cualquier video de **YouTube** en posts virales para **LinkedIn** y **Twitter** en segundos.
+Convierte uno o varios videos de **YouTube** en posts virales para **LinkedIn** y **Twitter** en segundos.
 Powered by **Groq, Whisper & Llama 3**.
 """)
 
-# 3. Input del Usuario (Barra de texto)
-url = st.text_input("🔗 Pega la URL del video de YouTube aquí:")
+col_config1, col_config2 = st.columns(2)
 
-# 4. Botón de Acción
-if st.button("✨ Generar Contenido"):
-    if not url:
-        st.error("❌ Por favor, ingresa una URL válida.")
-    else:
-        # Creamos un contenedor para mostrar el progreso
-        status_text = st.empty()
-        bar = st.progress(0)
+with col_config1:
+    urls_input = st.text_area("🔗 Pega las URLs aquí (Una por renglón):", height=150)
 
-        try:
-            # Paso A: Transcripción
-            status_text.text("🎧 Descargando audio y transcribiendo con Whisper...")
-            bar.progress(20)
+with col_config2:
+    st.write("### 🎯 Selecciona el formato:")
+    # LOS CHULITOS (Checkboxes)
+    check_linkedin = st.checkbox("Generar Post de LinkedIn", value=True)
+    check_twitter = st.checkbox("Generar Hilo de Twitter", value=True)
+
+if st.button("✨ Generar Contenido fusionado"):
+    if not urls_input:
+        st.error("❌ Por favor, ingresa al menos una URL válida.")
+        st.stop()
+        
+    if not check_linkedin and not check_twitter:
+        st.warning("⚠️ Debes seleccionar al menos una plataforma (LinkedIn o Twitter).")
+        st.stop()
+        
+    selected_platforms = []
+    if check_linkedin: selected_platforms.append("linkedin")
+    if check_twitter: selected_platforms.append("twitter")
+    
+    url_list = [line.strip() for line in urls_input.split('\n') if line.strip()]
+    
+    status_text = st.empty()
+    bar = st.progress(0)
+    
+    full_transcription = ""
+    total_videos = len(url_list)
+
+    try:
+        for i, url in enumerate(url_list):
+            status_text.text(f"🎧 Procesando video {i+1} de {total_videos}: {url}...")
             
-            # Llamamos a tu función original
-            transcription = transcriber.transcribe_url(url)
+            text = transcriber.transcribe_url(url, index=i)
             
-            bar.progress(50)
+            full_transcription += f"\n\n--- TRANSCRIPCIÓN VIDEO {i+1} ({url}) ---\n{text}"
+
             status_text.text("🧠 Generando textos con Llama 3...")
             
-            # Paso B: Generación
-            content = generator.generate_content(transcription)
+            progress = int((i + 1) / total_videos * 50)
+            bar.progress(progress)
             
-            bar.progress(100)
-            status_text.text("✅ ¡Listo!")
-            
-            # 5. Mostrar Resultados en dos columnas
-            col1, col2 = st.columns(2)
+        status_text.text("🧠 Analizando toda la información combinada con Llama 3...")
+        
+        bar.progress(60)    
+        
+        content = generator.generate_content(full_transcription[:25000])
+        
+        bar.progress(100)
+        
+        status_text.text("✅ ¡Contenido Generado!")
+        
+        col1, col2 = st.columns(2)
 
-            with col1:
-                st.subheader("🟦 LinkedIn Post")
-                st.markdown(content['linkedin'])
-                # Botón para copiar/descargar
-                st.download_button(
-                    label="📥 Descargar Markdown LinkedIn",
-                    data=content['linkedin'],
-                    file_name="post_linkedin.md",
-                    mime="text/markdown"
-                )
+        with col1:
+            st.subheader("🟦 LinkedIn Post")
+            st.markdown(content['linkedin'])
+            st.download_button(
+                label="📥 Descargar Markdown LinkedIn",
+                data=content['linkedin'],
+                file_name="post_linkedin.md",
+                mime="text/markdown"
+            )
 
-            with col2:
-                st.subheader("🐦 Twitter Thread")
-                st.markdown(content['twitter'])
-                st.download_button(
-                    label="📥 Descargar Markdown Twitter",
-                    data=content['twitter'],
-                    file_name="hilo_twitter.md",
-                    mime="text/markdown"
-                )
+        with col2:
+            st.subheader("🐦 Twitter Thread")
+            st.markdown(content['twitter'])
+            st.download_button(
+                label="📥 Descargar Markdown Twitter",
+                data=content['twitter'],
+                file_name="hilo_twitter.md",
+                mime="text/markdown"
+            )
 
-            # Mostrar la transcripción original en un desplegable (por si acaso)
-            with st.expander("Ver Transcripción Original"):
-                st.write(transcription)
+        with st.expander("Ver Transcripción Combinada Completa"):
+            st.write(full_transcription)
 
-        except Exception as e:
-            st.error(f"Ocurrió un error: {e}")
+    except Exception as e:
+        st.error(f"Ocurrió un error: {e}")
