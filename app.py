@@ -43,7 +43,7 @@ def check_daily_limit(user_id):
 
         # 2. DEFINIR EL LÍMITE SEGÚN EL PLAN
         if user_plan == 'pro':
-            limit = 50  # Los PRO pueden hacer 50 videos
+            limit = 10  # Los PRO pueden hacer 50 videos
         else:
             limit = 3   # Los gratis solo 3
 
