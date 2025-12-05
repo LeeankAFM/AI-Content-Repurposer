@@ -2,25 +2,83 @@ import streamlit as st
 import backend.transcriber as transcriber
 import backend.generator as generator
 import os
+from datetime import datetime, timezone
 from appwrite.client import Client
 from appwrite.services.account import Account
+from appwrite.services.databases import Databases
+from appwrite.query import Query
+from appwrite.id import ID
 
 # Configuración de página
 st.set_page_config(page_title="Multi-Video Repurposer", page_icon="🤖", layout="wide")
 
-# --- CONFIGURACIÓN APPWRITE ---
+# --- VARIABLES DE ENTORNO ---
 APPWRITE_ENDPOINT = os.environ.get("APPWRITE_ENDPOINT")
 APPWRITE_PROJECT_ID = os.environ.get("APPWRITE_PROJECT_ID")
+APPWRITE_DB_ID = os.environ.get("APPWRITE_DATABASE_ID")
+APPWRITE_COL_ID = os.environ.get("APPWRITE_COLLECTION_ID")
 
-def init_appwrite():
+# --- CONFIGURACIÓN APPWRITE ---
+def get_appwrite_services():
     if not APPWRITE_ENDPOINT or not APPWRITE_PROJECT_ID:
         st.error("❌ Faltan configuraciones de Appwrite.")
-        return None
+        return None, None
+    
     client = Client()
     client.set_endpoint(APPWRITE_ENDPOINT)
     client.set_project(APPWRITE_PROJECT_ID)
-    return Account(client)
+    
+    return Account(client), Databases(client)
 
+# --- LÓGICA DE LÍMITE DIARIO ---
+def check_daily_limit(user_id):
+    """Retorna True si el usuario puede continuar, False si excedió el límite"""
+    account, databases = get_appwrite_services()
+    if not databases: return False
+
+    try:
+        # Obtenemos la fecha de hoy en formato ISO simple (YYYY-MM-DD)
+        today_start = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00.000+00:00")
+        
+        # Consultamos registros de este usuario creados DESPUÉS del inicio del día de hoy
+        result = databases.list_documents(
+            database_id=APPWRITE_DB_ID,
+            collection_id=APPWRITE_COL_ID,
+            queries=[
+                Query.equal("user_id", user_id),
+                Query.greater_than("$createdAt", today_start) 
+            ]
+        )
+        
+        usage_count = result['total']
+        limit = 3 # LÍMITE DE VIDEOS
+        
+        if usage_count >= limit:
+            return False, usage_count
+        return True, usage_count
+        
+    except Exception as e:
+        print(f"Error consultando DB: {e}")
+        # En caso de error de DB, por seguridad permitimos (o bloqueamos, según prefieras)
+        return True, 0
+
+def log_usage(user_id, video_url):
+    """Guarda un registro en la base de datos"""
+    account, databases = get_appwrite_services()
+    try:
+        databases.create_document(
+            database_id=APPWRITE_DB_ID,
+            collection_id=APPWRITE_COL_ID,
+            document_id=ID.unique(),
+            data={
+                "user_id": user_id,
+                "video_url": video_url
+            }
+        )
+    except Exception as e:
+        print(f"No se pudo guardar el log: {e}")
+
+# --- LOGIN ---
 def login_page():
     st.title("🔐 Iniciar Sesión")
     st.write("Accede para usar el Repurposer AI")
@@ -29,20 +87,22 @@ def login_page():
     password = st.text_input("Contraseña", type="password")
     
     if st.button("Ingresar"):
-        account = init_appwrite()
+        account, _ = get_appwrite_services()
         try:
-            # Crear sesión (esto devuelve un objeto sesión si es exitoso)
             session = account.create_email_password_session(email, password)
             st.session_state['user_id'] = session['userId']
             st.success("¡Bienvenido!")
-            st.rerun() # Recargar la página para mostrar la app
+            st.rerun()
         except Exception as e:
             st.error(f"Error de autenticación: {e}")
 
+# --- APP PRINCIPAL ---
 def main_app():
-    # --- AQUÍ VA TU CÓDIGO ORIGINAL COMPLETO ---
+    user_id = st.session_state['user_id']
+    
+    # Botón de cerrar sesión en la barra lateral
     if st.sidebar.button("Cerrar Sesión"):
-        account = init_appwrite()
+        account, _ = get_appwrite_services()
         try:
             account.delete_session('current')
         except:
@@ -51,8 +111,19 @@ def main_app():
         st.rerun()
 
     st.title("🤖 AI Multi-Video Repurposer")
+    
+    # --- MOSTRAR USO ACTUAL ---
+    can_proceed, usage_count = check_daily_limit(user_id)
+    st.sidebar.write(f"📊 **Uso Diario:** {usage_count} / 3 videos")
+    
+    if not can_proceed:
+        st.error("🚫 **Has alcanzado tu límite de 3 videos por hoy.**")
+        st.info("💡 Vuelve mañana para seguir creando contenido.")
+        # Aquí podrías poner un botón de [Actualizar a PRO]
+        return # Detenemos la ejecución de la app aquí si superó el límite
+
     st.markdown("""
-    Convierte uno o varios videos de **YouTube** en posts virales para **LinkedIn** y **Twitter**.
+    Convierte uno o varios videos de **YouTube** en posts virales.
     *Límite: Videos de máx 20 minutos.*
     """)
 
@@ -71,15 +142,21 @@ def main_app():
             st.error("❌ Por favor, ingresa al menos una URL válida.")
             st.stop()
             
+        url_list = [line.strip() for line in urls_input.split('\n') if line.strip()]
+        
+        # Verificar cuántos videos intenta procesar AHORA vs cuantos le quedan
+        videos_remaining = 3 - usage_count
+        if len(url_list) > videos_remaining:
+            st.warning(f"⚠️ Intentas procesar {len(url_list)} videos, pero solo te quedan {videos_remaining} usos hoy.")
+            st.stop()
+
         if not check_linkedin and not check_twitter:
-            st.warning("⚠️ Debes seleccionar al menos una plataforma.")
+            st.warning("⚠️ Selecciona al menos una plataforma.")
             st.stop()
             
         selected_platforms = []
         if check_linkedin: selected_platforms.append("linkedin")
         if check_twitter: selected_platforms.append("twitter")
-        
-        url_list = [line.strip() for line in urls_input.split('\n') if line.strip()]
         
         status_text = st.empty()
         bar = st.progress(0)
@@ -91,10 +168,13 @@ def main_app():
             for i, url in enumerate(url_list):
                 status_text.text(f"🎧 Procesando video {i+1} de {total_videos}: {url}...")
                 
-                # Esto ahora llama a la función con el chequeo de 20 min
+                # Transcribir
                 text = transcriber.transcribe_url(url, index=i)
-                
                 full_transcription += f"\n\n--- TRANSCRIPCIÓN VIDEO {i+1} ({url}) ---\n{text}"
+                
+                # --- REGISTRAR USO EN BD ---
+                # Importante: Registramos cada video procesado exitosamente
+                log_usage(user_id, url)
 
                 status_text.text("🧠 Generando textos con Llama 3...")
                 progress = int((i + 1) / total_videos * 50)
@@ -107,6 +187,7 @@ def main_app():
             bar.progress(100)
             status_text.text("✅ ¡Contenido Generado!")
             
+            # (El resto del código de visualización sigue igual...)
             if 'linkedin' in content and 'twitter' in content:
                 col1, col2 = st.columns(2)
             else:
@@ -123,14 +204,14 @@ def main_app():
                 with target_col:
                     st.subheader("🐦 Twitter Thread")
                     st.markdown(content['twitter'])
-
-            with st.expander("Ver Transcripción Completa"):
-                st.write(full_transcription)
+            
+            # Actualizamos el contador visualmente forzando un rerun al final o mostrando aviso
+            st.toast("¡Consumo registrado! Vuelve a cargar para ver tu cupo actualizado.")
 
         except Exception as e:
             st.error(f"Ocurrió un error: {e}")
 
-# --- CONTROL DE FLUJO PRINCIPAL ---
+# --- CONTROL DE FLUJO ---
 if 'user_id' not in st.session_state:
     login_page()
 else:
