@@ -32,15 +32,24 @@ def get_appwrite_services():
 
 # --- LÓGICA DE LÍMITE DIARIO ---
 def check_daily_limit(user_id):
-    """Retorna True si el usuario puede continuar, False si excedió el límite"""
     account, databases = get_appwrite_services()
     if not databases: return False
 
     try:
-        # Obtenemos la fecha de hoy en formato ISO simple (YYYY-MM-DD)
+        # 1. VERIFICAR QUÉ PLAN TIENE EL USUARIO
+        # Obtenemos las preferencias del usuario actual
+        prefs = account.get_prefs()
+        user_plan = prefs.get('plan', 'free') # Si no tiene nada, asume 'free'
+
+        # 2. DEFINIR EL LÍMITE SEGÚN EL PLAN
+        if user_plan == 'pro':
+            limit = 50  # Los PRO pueden hacer 50 videos
+        else:
+            limit = 3   # Los gratis solo 3
+
+        # 3. CONTAR CUÁNTOS LLEVA HOY (Igual que antes...)
         today_start = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00.000+00:00")
         
-        # Consultamos registros de este usuario creados DESPUÉS del inicio del día de hoy
         result = databases.list_documents(
             database_id=APPWRITE_DB_ID,
             collection_id=APPWRITE_COL_ID,
@@ -51,16 +60,15 @@ def check_daily_limit(user_id):
         )
         
         usage_count = result['total']
-        limit = 3 # LÍMITE DE VIDEOS
         
+        # Le pasamos el límite dinámico a la respuesta para mostrarlo en pantalla
         if usage_count >= limit:
-            return False, usage_count
-        return True, usage_count
+            return False, usage_count, limit
+        return True, usage_count, limit
         
     except Exception as e:
-        print(f"Error consultando DB: {e}")
-        # En caso de error de DB, por seguridad permitimos (o bloqueamos, según prefieras)
-        return True, 0
+        print(f"Error consultando: {e}")
+        return True, 0, 3
 
 def log_usage(user_id, video_url):
     """Guarda un registro en la base de datos"""
