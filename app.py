@@ -121,8 +121,9 @@ def main_app():
     st.title("🤖 AI Multi-Video Repurposer")
     
     # --- MOSTRAR USO ACTUAL ---
-    can_proceed, usage_count = check_daily_limit(user_id)
-    st.sidebar.write(f"📊 **Uso Diario:** {usage_count} / 3 videos")
+    can_proceed, usage_count, limit = check_daily_limit(user_id) 
+    
+    st.sidebar.write(f"📊 **Uso Diario:** {usage_count} / {limit} videos")
     
     if not can_proceed:
         st.error("🚫 **Has alcanzado tu límite de 3 videos por hoy.**")
@@ -153,7 +154,7 @@ def main_app():
         url_list = [line.strip() for line in urls_input.split('\n') if line.strip()]
         
         # Verificar cuántos videos intenta procesar AHORA vs cuantos le quedan
-        videos_remaining = 3 - usage_count
+        videos_remaining = limit - usage_count
         if len(url_list) > videos_remaining:
             st.warning(f"⚠️ Intentas procesar {len(url_list)} videos, pero solo te quedan {videos_remaining} usos hoy.")
             st.stop()
