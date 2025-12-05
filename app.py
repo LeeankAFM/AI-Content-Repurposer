@@ -108,6 +108,16 @@ def login_page():
 def main_app():
     user_id = st.session_state['user_id']
     
+    # --- ESTILOS CSS PARA OCULTAR MENÚ Y FOOTER ---
+    hide_menu_style = """
+        <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        </style>
+        """
+    st.markdown(hide_menu_style, unsafe_allow_html=True)
+    
     # Botón de cerrar sesión en la barra lateral
     if st.sidebar.button("Cerrar Sesión"):
         account, _ = get_appwrite_services()
