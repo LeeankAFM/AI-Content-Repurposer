@@ -2,3 +2,4 @@ streamlit
 yt-dlp
 groq
 python-dotenv
+appwrite
