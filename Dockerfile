@@ -1,9 +1,10 @@
 FROM python:3.9-slim
 
-# Instalar FFmpeg y git (necesario para algunas dependencias)
+# Instalar FFmpeg, git Y CURL (Agregamos curl aquí)
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     git \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -18,7 +19,7 @@ COPY . .
 # Exponer el puerto de Streamlit
 EXPOSE 8501
 
-# Chequeo de salud (opcional pero recomendado para Coolify)
+# Chequeo de salud (Ahora sí funcionará porque instalamos curl)
 HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1
 
 # Comando de inicio
