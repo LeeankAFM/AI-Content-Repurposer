@@ -1,5 +1,8 @@
-streamlit
-yt-dlp
-groq
+fastapi
+uvicorn
+python-multipart
+jinja2
 python-dotenv
+groq
+yt-dlp
 appwrite

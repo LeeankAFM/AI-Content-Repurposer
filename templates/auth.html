@@ -1,0 +1,65 @@
+{% extends "base.html" %} {% block content %}
+<div class="w-full max-w-md">
+  <div class="bg-cardbg p-8 rounded-2xl shadow-2xl border border-gray-700">
+    <div class="text-center mb-8">
+      <h2 class="text-3xl font-bold text-white mb-2">Bienvenido</h2>
+      <p class="text-gray-400">Transforma tus videos con IA</p>
+    </div>
+
+    <!-- Mensajes de Error/Exito -->
+    {% if error %}
+    <div
+      class="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded-lg mb-4 text-sm text-center"
+    >
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <!-- Formulario -->
+    <form method="POST" action="/login" id="authForm" class="space-y-6">
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-1"
+          >Email</label
+        >
+        <input
+          type="email"
+          name="email"
+          required
+          class="w-full bg-slate-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition"
+        />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-1"
+          >Contraseña</label
+        >
+        <input
+          type="password"
+          name="password"
+          required
+          class="w-full bg-slate-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-brand focus:border-transparent outline-none transition"
+        />
+      </div>
+
+      <!-- Botón de Acción -->
+      <button
+        type="submit"
+        id="submitBtn"
+        class="w-full bg-brand hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg shadow-lg hover:shadow-indigo-500/20 transition duration-200"
+      >
+        Iniciar Sesión
+      </button>
+    </form>
+
+    <div class="mt-6 text-center text-sm">
+      <p class="text-gray-400" id="toggleText">¿No tienes cuenta?</p>
+      <button
+        onclick="toggleMode()"
+        class="text-brand hover:text-indigo-300 font-medium mt-1"
+      >
+        <span id="toggleLink">Crear cuenta gratis</span>
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}

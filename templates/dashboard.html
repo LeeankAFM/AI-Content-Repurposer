@@ -1,0 +1,154 @@
+{% extends "base.html" %} {% block content %}
+<div class="w-full max-w-4xl space-y-8">
+  <!-- Encabezado -->
+  <div class="flex justify-between items-end border-b border-gray-700 pb-4">
+    <div>
+      <h1 class="text-3xl font-bold text-white">Dashboard</h1>
+      <p class="text-gray-400 mt-1">Genera contenido viral desde YouTube.</p>
+    </div>
+    <div class="text-right">
+      <div class="text-sm text-gray-400">Créditos hoy</div>
+      <div class="text-2xl font-bold text-brand">
+        {{ usage_count }} / {{ limit }}
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <!-- Columna Izquierda: Inputs -->
+    <div class="space-y-6">
+      <div class="bg-cardbg p-6 rounded-xl border border-gray-700">
+        <label class="block text-sm font-medium text-gray-300 mb-2">
+          <i class="fa-brands fa-youtube text-red-500 mr-2"></i>URLs de YouTube
+        </label>
+        <textarea
+          id="urls"
+          rows="5"
+          placeholder="https://youtube.com/watch?v=..."
+          class="w-full bg-slate-900 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-brand outline-none text-sm"
+        ></textarea>
+        <p class="text-xs text-gray-500 mt-2 text-right">
+          Una URL por línea. Máx 20 min.
+        </p>
+      </div>
+
+      <div class="bg-cardbg p-6 rounded-xl border border-gray-700">
+        <label class="block text-sm font-medium text-gray-300 mb-4"
+          >Formatos a generar</label
+        >
+        <div class="space-y-3">
+          <label class="flex items-center space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              id="linkedin"
+              checked
+              class="form-checkbox h-5 w-5 text-brand rounded border-gray-600 bg-slate-900 focus:ring-0"
+            />
+            <span class="text-gray-300"
+              ><i class="fa-brands fa-linkedin text-blue-500 mr-2"></i>Post
+              LinkedIn</span
+            >
+          </label>
+          <label class="flex items-center space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              id="twitter"
+              checked
+              class="form-checkbox h-5 w-5 text-brand rounded border-gray-600 bg-slate-900 focus:ring-0"
+            />
+            <span class="text-gray-300"
+              ><i class="fa-brands fa-twitter text-sky-400 mr-2"></i>Hilo de
+              Twitter</span
+            >
+          </label>
+        </div>
+      </div>
+
+      <button
+        onclick="generateContent()"
+        id="generateBtn"
+        class="w-full bg-brand hover:bg-indigo-500 text-white font-bold py-3 rounded-xl shadow-lg hover:shadow-indigo-500/20 transition flex justify-center items-center gap-2"
+      >
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+        <span>Generar Contenido</span>
+      </button>
+    </div>
+
+    <!-- Columna Derecha: Resultados -->
+    <div
+      class="bg-cardbg p-6 rounded-xl border border-gray-700 min-h-[500px] flex flex-col"
+    >
+      <h3 class="text-lg font-semibold text-white mb-4">Resultados</h3>
+
+      <!-- Estado Inicial -->
+      <div
+        id="emptyState"
+        class="flex-grow flex flex-col items-center justify-center text-gray-500 opacity-50"
+      >
+        <i class="fa-solid fa-layer-group text-4xl mb-3"></i>
+        <p>El contenido aparecerá aquí</p>
+      </div>
+
+      <!-- Loader -->
+      <div
+        id="loader"
+        class="hidden flex-grow flex flex-col items-center justify-center"
+      >
+        <div
+          class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand mb-4"
+        ></div>
+        <p class="text-gray-300 animate-pulse">
+          Analizando videos y redactando...
+        </p>
+        <p class="text-xs text-gray-500 mt-2">
+          Esto puede tomar 1 o 2 minutos.
+        </p>
+      </div>
+
+      <!-- Contenido Generado -->
+      <div
+        id="resultsArea"
+        class="hidden space-y-6 overflow-y-auto max-h-[600px] pr-2"
+      >
+        <!-- LinkedIn -->
+        <div id="resLinkedin" class="hidden">
+          <div class="flex justify-between items-center mb-2">
+            <h4 class="text-blue-400 font-bold">
+              <i class="fa-brands fa-linkedin"></i> LinkedIn
+            </h4>
+            <button
+              onclick="copyToClipboard('txtLinkedin')"
+              class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-white transition"
+            >
+              Copiar
+            </button>
+          </div>
+          <pre
+            id="txtLinkedin"
+            class="bg-slate-900 p-4 rounded-lg text-sm text-gray-300 whitespace-pre-wrap font-sans border border-gray-800"
+          ></pre>
+        </div>
+
+        <!-- Twitter -->
+        <div id="resTwitter" class="hidden">
+          <div class="flex justify-between items-center mb-2">
+            <h4 class="text-sky-400 font-bold">
+              <i class="fa-brands fa-twitter"></i> Twitter
+            </h4>
+            <button
+              onclick="copyToClipboard('txtTwitter')"
+              class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-white transition"
+            >
+              Copiar
+            </button>
+          </div>
+          <pre
+            id="txtTwitter"
+            class="bg-slate-900 p-4 rounded-lg text-sm text-gray-300 whitespace-pre-wrap font-sans border border-gray-800"
+          ></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

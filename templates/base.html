@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Repurposer SaaS</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Iconos -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              brand: "#6366f1", // Indigo
+              darkbg: "#0f172a", // Slate 900
+              cardbg: "#1e293b", // Slate 800
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body
+    class="bg-darkbg text-gray-100 font-sans antialiased min-h-screen flex flex-col"
+  >
+    <!-- Navbar -->
+    <nav
+      class="border-b border-gray-700 bg-cardbg/50 backdrop-blur-md sticky top-0 z-50"
+    >
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16 items-center">
+          <div class="flex items-center gap-3">
+            <i class="fa-solid fa-robot text-brand text-2xl"></i>
+            <span class="font-bold text-xl tracking-tight">AI Repurposer</span>
+          </div>
+          <div class="flex items-center gap-4">
+            {% if user %}
+            <span class="text-sm text-gray-400 hidden sm:block"
+              >{{ user.email }}</span
+            >
+            <a
+              href="/logout"
+              class="text-sm font-medium text-red-400 hover:text-red-300 transition"
+            >
+              <i class="fa-solid fa-sign-out-alt"></i> Salir
+            </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Contenido Principal -->
+    <main class="flex-grow flex flex-col items-center justify-center p-6">
+      {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer
+      class="border-t border-gray-800 mt-auto py-6 text-center text-gray-500 text-sm"
+    >
+      <p>&copy; 2025 AI Content Repurposer. All rights reserved.</p>
+    </footer>
+    <script src="/static/script.js"></script>
+  </body>
+</html>
