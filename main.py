@@ -27,13 +27,15 @@ APPWRITE_PROJECT_ID = os.environ.get("APPWRITE_PROJECT_ID")
 APPWRITE_DB_ID = os.environ.get("APPWRITE_DATABASE_ID")
 APPWRITE_COL_ID = os.environ.get("APPWRITE_COLLECTION_ID")
 
-# Nombre único para la cookie de este proyecto para evitar conflictos
+# Nombre único de cookie para evitar conflictos con otros proyectos
 COOKIE_NAME = "session_ai_repurposer"
 
 def get_appwrite_client(session_id: str = None):
     client = Client()
     client.set_endpoint(APPWRITE_ENDPOINT)
     client.set_project(APPWRITE_PROJECT_ID)
+    # Si tu Appwrite no tiene certificado válido (self-signed), descomenta la siguiente línea:
+    # client.set_self_signed(True) 
     if session_id:
         client.set_session(session_id)
     return client
@@ -41,11 +43,8 @@ def get_appwrite_client(session_id: str = None):
 # --- MIDDLEWARE & UTILS ---
 
 async def get_current_user(request: Request):
-    # Buscamos la cookie con el nombre único
     session_id = request.cookies.get(COOKIE_NAME)
-    
     if not session_id:
-        print(f"⚠️ AVISO: No se encontró la cookie '{COOKIE_NAME}'.", flush=True)
         return None
     
     try:
@@ -53,11 +52,9 @@ async def get_current_user(request: Request):
         account = Account(client)
         user = account.get()
         user['client'] = client # Pasamos el cliente autenticado
-        
-        # print("✅ Usuario autenticado correctamente", flush=True)
         return user
     except Exception as e:
-        print(f"❌ ERROR APPWRITE AL VERIFICAR USUARIO: {e}", flush=True) 
+        print(f"❌ Error verificando usuario: {e}", flush=True)
         return None
 
 def check_limit(user_id, client):
@@ -98,23 +95,21 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
     client = get_appwrite_client()
     account = Account(client)
     try:
-        # Crear sesión en Appwrite
+        # Crear sesión
         session = account.create_email_password_session(email, password)
         
-        # Redirigir
         response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
         
-        # Guardar cookie con el nombre ÚNICO
+        # Guardar cookie SEGURA
         response.set_cookie(
             key=COOKIE_NAME, 
             value=session['secret'], 
             httponly=True, 
             samesite="lax",
-            secure=False  # False porque estás usando HTTP en este proyecto
+            secure=True  # TRUE porque ahora estás en HTTPS (nip.io)
         )
         return response
     except Exception as e:
-        print(f"❌ Error en Login: {e}", flush=True)
         return templates.TemplateResponse("auth.html", {"request": request, "error": f"Error: {str(e)}"})
 
 @app.post("/register", response_class=HTMLResponse)
@@ -123,17 +118,18 @@ async def register(request: Request, email: str = Form(...), password: str = For
     account = Account(client)
     try:
         account.create(ID.unique(), email, password)
-        # Auto-login tras registro
+        # Auto-login
         session = account.create_email_password_session(email, password)
         
         response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-
+        
+        # Guardar cookie SEGURA
         response.set_cookie(
             key=COOKIE_NAME, 
             value=session['secret'], 
             httponly=True, 
             samesite="lax",
-            secure=False 
+            secure=True # TRUE porque ahora estás en HTTPS (nip.io)
         )
         return response
     except Exception as e:
@@ -149,7 +145,6 @@ async def logout(request: Request):
             account.delete_session('current')
         except:
             pass
-    
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     response.delete_cookie(COOKIE_NAME)
     return response
@@ -180,7 +175,6 @@ async def process_video(
     if not user:
         return JSONResponse({"error": "No autorizado"}, status_code=401)
 
-    # Convertir boolean strings
     do_linkedin = linkedin == "true"
     do_twitter = twitter == "true"
     
@@ -195,11 +189,9 @@ async def process_video(
         databases = Databases(user['client'])
 
         for i, url in enumerate(url_list):
-            # Transcribir (Tu lógica existente)
             text = transcriber.transcribe_url(url, index=i)
             full_transcription += f"\n\n--- VIDEO {i+1} ---\n{text}"
             
-            # Guardar log en DB
             databases.create_document(
                 database_id=APPWRITE_DB_ID,
                 collection_id=APPWRITE_COL_ID,
@@ -207,7 +199,6 @@ async def process_video(
                 data={"user_id": user['$id'], "video_url": url}
             )
 
-        # Generar contenido
         platforms = []
         if do_linkedin: platforms.append("linkedin")
         if do_twitter: platforms.append("twitter")
