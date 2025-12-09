@@ -46,9 +46,10 @@ async def get_current_user(request: Request):
         client = get_appwrite_client(session_id)
         account = Account(client)
         user = account.get()
-        user['client'] = client # Pasamos el cliente autenticado
+        user['client'] = client
         return user
-    except:
+    except Exception as e:
+        print(f"❌ ERROR VERIFICANDO USUARIO: {e}")
         return None
 
 def check_limit(user_id, client):
