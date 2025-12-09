@@ -33,7 +33,7 @@ APPWRITE_DB_ID = os.environ.get("APPWRITE_DATABASE_ID")
 APPWRITE_COL_ID = os.environ.get("APPWRITE_COLLECTION_ID")
 
 # Nombre único de cookie
-COOKIE_NAME = "session_ai_repurposer"
+COOKIE_NAME = "session_ai_repurposer_v2"
 
 def get_appwrite_client(session_id: str = None):
     client = Client()
@@ -103,15 +103,19 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
     try:
         session = account.create_email_password_session(email, password)
         
+        # --- DEBUG CRÍTICO ---
+        secret = session.get('secret')
+        print(f"📦 SECRET DEBUG: {secret}", flush=True) 
+        # ---------------------
+
         response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
         
-        # CONFIGURACIÓN ROBUSTA DE COOKIE PARA HTTPS/PROXY
         response.set_cookie(
             key=COOKIE_NAME, 
-            value=session['secret'], 
+            value=secret,  # Usamos la variable directa
             httponly=True, 
-            samesite="none", # 'none' + secure=True es lo más compatible
-            secure=True,
+            samesite="lax", # 'lax' es más seguro y estable que 'none'
+            secure=True,    # True porque estamos en HTTPS (nip.io)
             path="/"
         )
         return response
@@ -132,7 +136,7 @@ async def register(request: Request, email: str = Form(...), password: str = For
             key=COOKIE_NAME, 
             value=session['secret'], 
             httponly=True, 
-            samesite="none",
+            samesite="lax",
             secure=True,
             path="/"
         )
