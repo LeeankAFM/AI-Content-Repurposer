@@ -11,15 +11,12 @@ from datetime import datetime, timezone
 import os
 import uvicorn
 
-# Tus módulos backend (asegúrate que existan en la carpeta backend/)
 import backend.transcriber as transcriber
 import backend.generator as generator
 
 app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="static"), name="static") 
-
-# ... resto del código ...
 
 # Configurar Templates
 templates = Jinja2Templates(directory="templates")
@@ -96,7 +93,7 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
         session = account.create_email_password_session(email, password)
         # Redirigir y guardar cookie
         response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-        response.set_cookie(key="session_id", value=session['$id'])
+        response.set_cookie(key="session_id", value=session['secret'], httponly=True)
         return response
     except Exception as e:
         return templates.TemplateResponse("auth.html", {"request": request, "error": f"Error: {str(e)}"})
@@ -110,7 +107,7 @@ async def register(request: Request, email: str = Form(...), password: str = For
         # Auto-login tras registro
         session = account.create_email_password_session(email, password)
         response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-        response.set_cookie(key="session_id", value=session['$id'])
+        response.set_cookie(key="session_id", value=session['secret'], httponly=True)
         return response
     except Exception as e:
         return templates.TemplateResponse("auth.html", {"request": request, "error": f"Error: {str(e)}"})
