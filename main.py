@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, Form, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware  # <--- IMPORTANTE
 from appwrite.client import Client
 from appwrite.services.account import Account
 from appwrite.services.databases import Databases
@@ -16,6 +17,10 @@ import backend.generator as generator
 
 app = FastAPI()
 
+# --- ARREGLO PARA COOLIFY / HTTPS ---
+# Esto permite que FastAPI sepa que está corriendo bajo HTTPS aunque Docker sea interno
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*") 
+
 app.mount("/static", StaticFiles(directory="static"), name="static") 
 
 # Configurar Templates
@@ -27,15 +32,13 @@ APPWRITE_PROJECT_ID = os.environ.get("APPWRITE_PROJECT_ID")
 APPWRITE_DB_ID = os.environ.get("APPWRITE_DATABASE_ID")
 APPWRITE_COL_ID = os.environ.get("APPWRITE_COLLECTION_ID")
 
-# Nombre único de cookie para evitar conflictos con otros proyectos
+# Nombre único de cookie
 COOKIE_NAME = "session_ai_repurposer"
 
 def get_appwrite_client(session_id: str = None):
     client = Client()
     client.set_endpoint(APPWRITE_ENDPOINT)
     client.set_project(APPWRITE_PROJECT_ID)
-    # Si tu Appwrite no tiene certificado válido (self-signed), descomenta la siguiente línea:
-    # client.set_self_signed(True) 
     if session_id:
         client.set_session(session_id)
     return client
@@ -44,14 +47,17 @@ def get_appwrite_client(session_id: str = None):
 
 async def get_current_user(request: Request):
     session_id = request.cookies.get(COOKIE_NAME)
+    
+    # DEBUG: Ver si llega la cookie ahora
     if not session_id:
+        # print(f"⚠️ Debug: Cookies recibidas: {request.cookies}", flush=True)
         return None
     
     try:
         client = get_appwrite_client(session_id)
         account = Account(client)
         user = account.get()
-        user['client'] = client # Pasamos el cliente autenticado
+        user['client'] = client
         return user
     except Exception as e:
         print(f"❌ Error verificando usuario: {e}", flush=True)
@@ -95,18 +101,18 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
     client = get_appwrite_client()
     account = Account(client)
     try:
-        # Crear sesión
         session = account.create_email_password_session(email, password)
         
         response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
         
-        # Guardar cookie SEGURA
+        # CONFIGURACIÓN ROBUSTA DE COOKIE PARA HTTPS/PROXY
         response.set_cookie(
             key=COOKIE_NAME, 
             value=session['secret'], 
             httponly=True, 
-            samesite="lax",
-            secure=True  # TRUE porque ahora estás en HTTPS (nip.io)
+            samesite="none", # 'none' + secure=True es lo más compatible
+            secure=True,
+            path="/"
         )
         return response
     except Exception as e:
@@ -118,18 +124,17 @@ async def register(request: Request, email: str = Form(...), password: str = For
     account = Account(client)
     try:
         account.create(ID.unique(), email, password)
-        # Auto-login
         session = account.create_email_password_session(email, password)
         
         response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
         
-        # Guardar cookie SEGURA
         response.set_cookie(
             key=COOKIE_NAME, 
             value=session['secret'], 
             httponly=True, 
-            samesite="lax",
-            secure=True # TRUE porque ahora estás en HTTPS (nip.io)
+            samesite="none",
+            secure=True,
+            path="/"
         )
         return response
     except Exception as e:
@@ -212,4 +217,4 @@ async def process_video(
         return JSONResponse({"error": str(e)}, status_code=500)
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8501, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8501, reload=True, proxy_headers=True, forwarded_allow_ips="*")
