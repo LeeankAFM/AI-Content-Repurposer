@@ -215,6 +215,33 @@ async def process_video(
     except Exception as e:
         print(f"Error: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
+    
+@app.get("/diagnostico")
+async def diagnostico(request: Request):
+    """Ruta para detectar por qué falla el login"""
+    results = {
+        "1_cookies_recibidas": request.cookies,
+        "2_cookie_esperada": COOKIE_NAME,
+        "3_tiene_cookie_sesion": COOKIE_NAME in request.cookies,
+        "4_endpoint_appwrite": APPWRITE_ENDPOINT,
+        "5_prueba_conexion": "Pendiente..."
+    }
+
+    # Intentar verificar cookie
+    session_id = request.cookies.get(COOKIE_NAME)
+    if session_id:
+        results["session_id_oculto"] = session_id[:5] + "..."
+        try:
+            client = get_appwrite_client(session_id)
+            account = Account(client)
+            user = account.get()
+            results["5_prueba_conexion"] = f"✅ ÉXITO: Usuario es {user.get('email', 'Desconocido')}"
+        except Exception as e:
+            results["5_prueba_conexion"] = f"❌ ERROR CONEXIÓN: {str(e)}"
+    else:
+        results["5_prueba_conexion"] = "⚠️ No se puede probar conexión sin cookie"
+
+    return JSONResponse(results)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8501, reload=True, proxy_headers=True, forwarded_allow_ips="*")
