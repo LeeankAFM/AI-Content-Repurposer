@@ -49,7 +49,7 @@ async def get_current_user(request: Request):
         user['client'] = client
         return user
     except Exception as e:
-        print(f"❌ ERROR VERIFICANDO USUARIO: {e}")
+        print(f"❌ ERROR: {e}", flush=True) 
         return None
 
 def check_limit(user_id, client):
