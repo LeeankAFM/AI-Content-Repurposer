@@ -38,18 +38,29 @@ def get_appwrite_client(session_id: str = None):
 # --- MIDDLEWARE & UTILS ---
 
 async def get_current_user(request: Request):
+    # --- DEBUGGING ---
+    # Imprime todas las cookies que llegan para ver si 'session_id' existe
+    print(f"🔍 DEBUG COOKIES: {request.cookies}", flush=True)
+    
     session_id = request.cookies.get("session_id")
+    
     if not session_id:
+        print("⚠️ AVISO: No se encontró session_id en las cookies. Redirigiendo...", flush=True)
         return None
     
     try:
+        # Imprime qué ID estamos intentando usar
+        print(f"🔑 Intentando autenticar con Session Secret: {session_id[:10]}...", flush=True)
+        
         client = get_appwrite_client(session_id)
         account = Account(client)
         user = account.get()
         user['client'] = client
+        
+        print("✅ Usuario autenticado correctamente", flush=True)
         return user
     except Exception as e:
-        print(f"❌ ERROR: {e}", flush=True) 
+        print(f"❌ ERROR APPWRITE: {e}", flush=True) 
         return None
 
 def check_limit(user_id, client):
@@ -94,7 +105,13 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
         session = account.create_email_password_session(email, password)
         # Redirigir y guardar cookie
         response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-        response.set_cookie(key="session_id", value=session['secret'], httponly=True)
+        response.set_cookie(
+    key="session_id", 
+    value=session['secret'], 
+    httponly=True, 
+    samesite="lax",  # Importante para que no la bloquee el navegador
+    secure=False     # Pon False para probar. Si usas HTTPS real, cámbialo a True luego.
+)
         return response
     except Exception as e:
         return templates.TemplateResponse("auth.html", {"request": request, "error": f"Error: {str(e)}"})
@@ -108,7 +125,13 @@ async def register(request: Request, email: str = Form(...), password: str = For
         # Auto-login tras registro
         session = account.create_email_password_session(email, password)
         response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-        response.set_cookie(key="session_id", value=session['secret'], httponly=True)
+        response.set_cookie(
+    key="session_id", 
+    value=session['secret'], 
+    httponly=True, 
+    samesite="lax",  # Importante para que no la bloquee el navegador
+    secure=False     # Pon False para probar. Si usas HTTPS real, cámbialo a True luego.
+)
         return response
     except Exception as e:
         return templates.TemplateResponse("auth.html", {"request": request, "error": f"Error: {str(e)}"})
