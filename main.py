@@ -27,6 +27,9 @@ APPWRITE_PROJECT_ID = os.environ.get("APPWRITE_PROJECT_ID")
 APPWRITE_DB_ID = os.environ.get("APPWRITE_DATABASE_ID")
 APPWRITE_COL_ID = os.environ.get("APPWRITE_COLLECTION_ID")
 
+# Nombre único para la cookie de este proyecto para evitar conflictos
+COOKIE_NAME = "session_ai_repurposer"
+
 def get_appwrite_client(session_id: str = None):
     client = Client()
     client.set_endpoint(APPWRITE_ENDPOINT)
@@ -38,29 +41,23 @@ def get_appwrite_client(session_id: str = None):
 # --- MIDDLEWARE & UTILS ---
 
 async def get_current_user(request: Request):
-    # --- DEBUGGING ---
-    # Imprime todas las cookies que llegan para ver si 'session_id' existe
-    print(f"🔍 DEBUG COOKIES: {request.cookies}", flush=True)
-    
-    session_id = request.cookies.get("session_id")
+    # Buscamos la cookie con el nombre único
+    session_id = request.cookies.get(COOKIE_NAME)
     
     if not session_id:
-        print("⚠️ AVISO: No se encontró session_id en las cookies. Redirigiendo...", flush=True)
+        print(f"⚠️ AVISO: No se encontró la cookie '{COOKIE_NAME}'.", flush=True)
         return None
     
     try:
-        # Imprime qué ID estamos intentando usar
-        print(f"🔑 Intentando autenticar con Session Secret: {session_id[:10]}...", flush=True)
-        
         client = get_appwrite_client(session_id)
         account = Account(client)
         user = account.get()
-        user['client'] = client
+        user['client'] = client # Pasamos el cliente autenticado
         
-        print("✅ Usuario autenticado correctamente", flush=True)
+        # print("✅ Usuario autenticado correctamente", flush=True)
         return user
     except Exception as e:
-        print(f"❌ ERROR APPWRITE: {e}", flush=True) 
+        print(f"❌ ERROR APPWRITE AL VERIFICAR USUARIO: {e}", flush=True) 
         return None
 
 def check_limit(user_id, client):
@@ -103,17 +100,21 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
     try:
         # Crear sesión en Appwrite
         session = account.create_email_password_session(email, password)
-        # Redirigir y guardar cookie
+        
+        # Redirigir
         response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+        
+        # Guardar cookie con el nombre ÚNICO
         response.set_cookie(
-    key="session_id", 
-    value=session['secret'], 
-    httponly=True, 
-    samesite="lax",  # Importante para que no la bloquee el navegador
-    secure=False     # Pon False para probar. Si usas HTTPS real, cámbialo a True luego.
-)
+            key=COOKIE_NAME, 
+            value=session['secret'], 
+            httponly=True, 
+            samesite="lax",
+            secure=False  # False porque estás usando HTTP en este proyecto
+        )
         return response
     except Exception as e:
+        print(f"❌ Error en Login: {e}", flush=True)
         return templates.TemplateResponse("auth.html", {"request": request, "error": f"Error: {str(e)}"})
 
 @app.post("/register", response_class=HTMLResponse)
@@ -124,21 +125,23 @@ async def register(request: Request, email: str = Form(...), password: str = For
         account.create(ID.unique(), email, password)
         # Auto-login tras registro
         session = account.create_email_password_session(email, password)
+        
         response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+
         response.set_cookie(
-    key="session_id", 
-    value=session['secret'], 
-    httponly=True, 
-    samesite="lax",  # Importante para que no la bloquee el navegador
-    secure=False     # Pon False para probar. Si usas HTTPS real, cámbialo a True luego.
-)
+            key=COOKIE_NAME, 
+            value=session['secret'], 
+            httponly=True, 
+            samesite="lax",
+            secure=False 
+        )
         return response
     except Exception as e:
         return templates.TemplateResponse("auth.html", {"request": request, "error": f"Error: {str(e)}"})
 
 @app.get("/logout")
 async def logout(request: Request):
-    session_id = request.cookies.get("session_id")
+    session_id = request.cookies.get(COOKIE_NAME)
     if session_id:
         try:
             client = get_appwrite_client(session_id)
@@ -146,8 +149,9 @@ async def logout(request: Request):
             account.delete_session('current')
         except:
             pass
+    
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
-    response.delete_cookie("session_id")
+    response.delete_cookie(COOKIE_NAME)
     return response
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -216,6 +220,5 @@ async def process_video(
         print(f"Error: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
-# Para correr en local (si lo ejecutas directo)
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8501, reload=True)
