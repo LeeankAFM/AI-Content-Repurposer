@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, Form, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware  # <--- IMPORTANTE
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from appwrite.client import Client
 from appwrite.services.account import Account
 from appwrite.services.databases import Databases
@@ -17,8 +17,6 @@ import backend.generator as generator
 
 app = FastAPI()
 
-# --- ARREGLO PARA COOLIFY / HTTPS ---
-# Esto permite que FastAPI sepa que está corriendo bajo HTTPS aunque Docker sea interno
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*") 
 
 app.mount("/static", StaticFiles(directory="static"), name="static") 
@@ -104,7 +102,16 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
         session = account.create_email_password_session(email, password)
         
         # --- DEBUG CRÍTICO ---
-        secret = session.get('secret')
+        if hasattr(session, 'secret'):
+            # Si es un Objeto (SDK nuevo)
+            secret = session.secret
+        elif isinstance(session, dict):
+            # Si es un Diccionario (SDK viejo)
+            secret = session.get('secret')
+        else:
+            # Fallback raro (tuplas o algo inesperado)
+            secret = str(session) 
+            
         print(f"📦 SECRET DEBUG: {secret}", flush=True) 
         # ---------------------
 
@@ -112,10 +119,10 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
         
         response.set_cookie(
             key=COOKIE_NAME, 
-            value=secret,  # Usamos la variable directa
+            value=secret,
             httponly=True, 
-            samesite="lax", # 'lax' es más seguro y estable que 'none'
-            secure=True,    # True porque estamos en HTTPS (nip.io)
+            samesite="lax",
+            secure=True,
             path="/"
         )
         return response
@@ -131,10 +138,19 @@ async def register(request: Request, email: str = Form(...), password: str = For
         session = account.create_email_password_session(email, password)
         
         response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+        if hasattr(session, 'secret'):
+            # Si es un Objeto (SDK nuevo)
+            secret = session.secret
+        elif isinstance(session, dict):
+            # Si es un Diccionario (SDK viejo)
+            secret = session.get('secret')
+        else:
+            # Fallback raro (tuplas o algo inesperado)
+            secret = str(session) 
         
         response.set_cookie(
             key=COOKIE_NAME, 
-            value=session['secret'], 
+            value=secret, 
             httponly=True, 
             samesite="lax",
             secure=True,
