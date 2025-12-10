@@ -95,6 +95,7 @@ async def home(request: Request):
         return RedirectResponse("/dashboard")
     return templates.TemplateResponse("auth.html", {"request": request})
 
+@app.post("/login", response_class=HTMLResponse)
 async def login(request: Request, email: str = Form(...), password: str = Form(...)):
     print("⚡ NUEVO CODIGO CARGADO: Intentando login manual...", flush=True)
 
