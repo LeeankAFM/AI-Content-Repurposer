@@ -11,6 +11,7 @@ from appwrite.id import ID
 from datetime import datetime, timezone
 import os
 import uvicorn
+import requests
 
 import backend.transcriber as transcriber
 import backend.generator as generator
