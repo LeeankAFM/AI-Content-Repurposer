@@ -95,77 +95,69 @@ async def home(request: Request):
         return RedirectResponse("/dashboard")
     return templates.TemplateResponse("auth.html", {"request": request})
 
-@app.post("/login", response_class=HTMLResponse)
 async def login(request: Request, email: str = Form(...), password: str = Form(...)):
-    # NOTA: Importante no pasar session_id aquí para que sea un cliente limpio
-    client = get_appwrite_client()
-    account = Account(client)
-    
+    print("⚡ NUEVO CODIGO CARGADO: Intentando login manual...", flush=True)
+
     try:
-        # 1. Crear sesión
-        session = account.create_email_password_session(email, password)
+        # Construimos la URL de la API manualmente para saltarnos el SDK
+        # El endpoint estándar es /account/sessions/email
+        url = f"{APPWRITE_ENDPOINT}/account/sessions/email"
         
-        secret = None
+        # Cabeceras necesarias
+        headers = {
+            "X-Appwrite-Project": APPWRITE_PROJECT_ID,
+            "Content-Type": "application/json"
+        }
         
-        # 2. Intento estándar (Body del JSON)
-        if isinstance(session, dict) and session.get('secret'):
-            secret = session.get('secret')
-        elif hasattr(session, 'secret') and session.secret:
-            secret = session.secret
+        # Datos
+        payload = {
+            "email": email,
+            "password": password
+        }
 
-        # 3. SI FALLA EL BODY, BUSCAMOS EN EL CLIENTE (EL FIX)
+        print(f"📡 Enviando POST a: {url}", flush=True)
+
+        # Hacemos la petición directa sin usar el SDK
+        response = requests.post(url, json=payload, headers=headers)
+
+        # Verificar error de credenciales
+        if response.status_code >= 400:
+            print(f"❌ Error Appwrite ({response.status_code}): {response.text}", flush=True)
+            return templates.TemplateResponse("auth.html", {"request": request, "error": "Email o contraseña incorrectos"})
+
+        # 1. Buscar secret en JSON
+        data = response.json()
+        secret = data.get('secret')
+        print(f"📦 Intento JSON: {secret}", flush=True)
+
+        # 2. Buscar secret en Cookies (Si JSON falló)
         if not secret:
-            print("⚠️ Secret vacío en body. Iniciando inspección profunda...", flush=True)
-            
-            # --- INSPECCIÓN DE ATRIBUTOS (Para ver en los logs) ---
-            # Esto imprimirá qué variables tiene tu cliente disponibles
-            print(f"🔍 ESTRUCTURA CLIENTE: {dir(client)}", flush=True)
-            # ------------------------------------------------------
-
-            # Probamos las ubicaciones más comunes de las cookies en Python
-            candidates = [
-                getattr(client, 'http', None),       # Versiones modernas
-                getattr(client, '_http', None),      # Versiones antiguas
-                getattr(client, 'session', None),    # Requests directo
-                getattr(client, '_session', None)    # Requests privado
-            ]
-
-            for i, candidate in enumerate(candidates):
-                if candidate:
-                    try:
-                        # Intentamos sacar las cookies de este candidato
-                        cookies = candidate.cookies.get_dict()
-                        print(f"🔎 Buscando en candidato {i}: {cookies}", flush=True)
-                        for key, value in cookies.items():
-                            if key.startswith('a_session_'):
-                                secret = value
-                                print(f"✅ ¡ENCONTRADO! Secret en candidato {i}", flush=True)
-                                break
-                    except Exception as e:
-                        print(f"⚠️ Candidato {i} falló: {e}", flush=True)
-                
-                if secret: break
-
-        # 4. Verificación final
+            print("⚠️ JSON vacío, buscando en cookies de la respuesta...", flush=True)
+            for cookie in response.cookies:
+                if cookie.name.startswith('a_session_'):
+                    secret = cookie.value
+                    print(f"✅ ¡SECRET ENCONTRADO EN COOKIE!: {secret[:10]}...", flush=True)
+                    break
+        
         if not secret:
-             print("❌ FATAL: No se encontró el secret en ningún lado.", flush=True)
-             raise Exception("Error de autenticación: No se recibió el token de sesión.")
+            raise Exception("No se recibió secret ni por JSON ni por Cookie")
 
-        # 5. Respuesta exitosa
-        response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-        response.set_cookie(
+        # Redirección
+        resp_redirect = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+        
+        resp_redirect.set_cookie(
             key=COOKIE_NAME, 
             value=secret,
             httponly=True, 
             samesite="lax",
-            secure=True,
+            secure=True, 
             path="/"
         )
-        return response
+        return resp_redirect
 
     except Exception as e:
-        print(f"❌ Login Exception: {e}", flush=True)
-        return templates.TemplateResponse("auth.html", {"request": request, "error": f"Error: {str(e)}"})
+        print(f"❌ Error Fatal Login: {e}", flush=True)
+        return templates.TemplateResponse("auth.html", {"request": request, "error": f"Error del sistema: {str(e)}"})
 
 @app.post("/register", response_class=HTMLResponse)
 async def register(request: Request, email: str = Form(...), password: str = Form(...)):
