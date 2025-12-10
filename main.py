@@ -99,47 +99,36 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
     client = get_appwrite_client()
     account = Account(client)
     try:
+        # 1. Creamos la sesión (Esto guarda la cookie internamente en Python)
         session = account.create_email_password_session(email, password)
         
-        # --- DIAGNÓSTICO NUCLEAR ---
-        print("\n\n🔥 --- INICIO DEBUG APPWRITE SESSION ---", flush=True)
-        print(f"Tipo de dato: {type(session)}", flush=True)
+        secret = None
         
-        # 1. Intentar ver el contenido crudo si es un Diccionario
-        if isinstance(session, dict):
-            print(f"DATA DICT: {session}", flush=True)
+        if isinstance(session, dict) and session.get('secret'):
             secret = session.get('secret')
-            
-        # 2. Intentar ver el contenido si es un Objeto (Clase)
-        else:
-            # Imprimimos todos los atributos disponibles
-            try:
-                print(f"DIR(session): {dir(session)}", flush=True)
-            except: 
-                pass
-                
-            # Intentamos sacar el diccionario interno del objeto (típico en SDKs)
-            if hasattr(session, '__dict__'):
-                print(f"VARS(session): {vars(session)}", flush=True)
-            
-            # Intentamos obtener 'secret' directamente
-            if hasattr(session, 'secret'):
-                secret = session.secret
-                print(f"VALOR DE session.secret: '{secret}'", flush=True)
-            else:
-                # A veces se llama de otra forma en versiones raras (ej: key, token)
-                secret = getattr(session, 'key', getattr(session, 'token', None))
-                print(f"VALOR DE session.key/token: '{secret}'", flush=True)
-
-        print("🔥 --- FIN DEBUG APPWRITE SESSION ---\n\n", flush=True)
-        # ---------------------------
+        elif hasattr(session, 'secret') and session.secret:
+            secret = session.secret
 
         if not secret:
-            return templates.TemplateResponse("auth.html", {
-                "request": request, 
-                "error": "Error fatal: Appwrite creó la sesión pero no devolvió el 'secret'. Revisa los logs del servidor."
-            })
+            print("⚠️ Secret vacío en body, buscando en cookies internas...", flush=True)
+            try:
+                # Accedemos a las cookies internas de la librería requests
+                cookies_dict = client._http.cookies.get_dict()
+                
+                # Buscamos la cookie que empieza por 'a_session_' (formato de Appwrite)
+                for key, value in cookies_dict.items():
+                    if key.startswith('a_session_'):
+                        secret = value
+                        print(f"✅ Secret encontrado en cookies: {key}", flush=True)
+                        break
+            except Exception as cookie_err:
+                print(f"❌ Error buscando cookies internas: {cookie_err}", flush=True)
 
+        # 4. Verificación final
+        if not secret:
+             raise Exception("No se pudo recuperar el token de sesión ni del body ni de las cookies.")
+
+        # 5. Crear respuesta
         response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
         
         response.set_cookie(
@@ -151,8 +140,9 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
             path="/"
         )
         return response
+
     except Exception as e:
-        print(f"❌ LOGIN EXCEPTION: {e}", flush=True)
+        print(f"❌ Login Error Final: {e}", flush=True)
         return templates.TemplateResponse("auth.html", {"request": request, "error": f"Error: {str(e)}"})
 
 @app.post("/register", response_class=HTMLResponse)
