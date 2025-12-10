@@ -101,19 +101,44 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
     try:
         session = account.create_email_password_session(email, password)
         
-        # --- DEBUG CRÍTICO ---
-        if hasattr(session, 'secret'):
-            # Si es un Objeto (SDK nuevo)
-            secret = session.secret
-        elif isinstance(session, dict):
-            # Si es un Diccionario (SDK viejo)
+        # --- DIAGNÓSTICO NUCLEAR ---
+        print("\n\n🔥 --- INICIO DEBUG APPWRITE SESSION ---", flush=True)
+        print(f"Tipo de dato: {type(session)}", flush=True)
+        
+        # 1. Intentar ver el contenido crudo si es un Diccionario
+        if isinstance(session, dict):
+            print(f"DATA DICT: {session}", flush=True)
             secret = session.get('secret')
-        else:
-            # Fallback raro (tuplas o algo inesperado)
-            secret = str(session) 
             
-        print(f"📦 SECRET DEBUG: {secret}", flush=True) 
-        # ---------------------
+        # 2. Intentar ver el contenido si es un Objeto (Clase)
+        else:
+            # Imprimimos todos los atributos disponibles
+            try:
+                print(f"DIR(session): {dir(session)}", flush=True)
+            except: 
+                pass
+                
+            # Intentamos sacar el diccionario interno del objeto (típico en SDKs)
+            if hasattr(session, '__dict__'):
+                print(f"VARS(session): {vars(session)}", flush=True)
+            
+            # Intentamos obtener 'secret' directamente
+            if hasattr(session, 'secret'):
+                secret = session.secret
+                print(f"VALOR DE session.secret: '{secret}'", flush=True)
+            else:
+                # A veces se llama de otra forma en versiones raras (ej: key, token)
+                secret = getattr(session, 'key', getattr(session, 'token', None))
+                print(f"VALOR DE session.key/token: '{secret}'", flush=True)
+
+        print("🔥 --- FIN DEBUG APPWRITE SESSION ---\n\n", flush=True)
+        # ---------------------------
+
+        if not secret:
+            return templates.TemplateResponse("auth.html", {
+                "request": request, 
+                "error": "Error fatal: Appwrite creó la sesión pero no devolvió el 'secret'. Revisa los logs del servidor."
+            })
 
         response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
         
@@ -127,6 +152,7 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
         )
         return response
     except Exception as e:
+        print(f"❌ LOGIN EXCEPTION: {e}", flush=True)
         return templates.TemplateResponse("auth.html", {"request": request, "error": f"Error: {str(e)}"})
 
 @app.post("/register", response_class=HTMLResponse)
