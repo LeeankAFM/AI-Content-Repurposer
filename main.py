@@ -96,41 +96,62 @@ async def home(request: Request):
 
 @app.post("/login", response_class=HTMLResponse)
 async def login(request: Request, email: str = Form(...), password: str = Form(...)):
+    # NOTA: Importante no pasar session_id aquí para que sea un cliente limpio
     client = get_appwrite_client()
     account = Account(client)
+    
     try:
-        # 1. Creamos la sesión (Esto guarda la cookie internamente en Python)
+        # 1. Crear sesión
         session = account.create_email_password_session(email, password)
         
         secret = None
         
+        # 2. Intento estándar (Body del JSON)
         if isinstance(session, dict) and session.get('secret'):
             secret = session.get('secret')
         elif hasattr(session, 'secret') and session.secret:
             secret = session.secret
 
+        # 3. SI FALLA EL BODY, BUSCAMOS EN EL CLIENTE (EL FIX)
         if not secret:
-            print("⚠️ Secret vacío en body, buscando en cookies internas...", flush=True)
-            try:
-                # Accedemos a las cookies internas de la librería requests
-                cookies_dict = client._http.cookies.get_dict()
+            print("⚠️ Secret vacío en body. Iniciando inspección profunda...", flush=True)
+            
+            # --- INSPECCIÓN DE ATRIBUTOS (Para ver en los logs) ---
+            # Esto imprimirá qué variables tiene tu cliente disponibles
+            print(f"🔍 ESTRUCTURA CLIENTE: {dir(client)}", flush=True)
+            # ------------------------------------------------------
+
+            # Probamos las ubicaciones más comunes de las cookies en Python
+            candidates = [
+                getattr(client, 'http', None),       # Versiones modernas
+                getattr(client, '_http', None),      # Versiones antiguas
+                getattr(client, 'session', None),    # Requests directo
+                getattr(client, '_session', None)    # Requests privado
+            ]
+
+            for i, candidate in enumerate(candidates):
+                if candidate:
+                    try:
+                        # Intentamos sacar las cookies de este candidato
+                        cookies = candidate.cookies.get_dict()
+                        print(f"🔎 Buscando en candidato {i}: {cookies}", flush=True)
+                        for key, value in cookies.items():
+                            if key.startswith('a_session_'):
+                                secret = value
+                                print(f"✅ ¡ENCONTRADO! Secret en candidato {i}", flush=True)
+                                break
+                    except Exception as e:
+                        print(f"⚠️ Candidato {i} falló: {e}", flush=True)
                 
-                # Buscamos la cookie que empieza por 'a_session_' (formato de Appwrite)
-                for key, value in cookies_dict.items():
-                    if key.startswith('a_session_'):
-                        secret = value
-                        print(f"✅ Secret encontrado en cookies: {key}", flush=True)
-                        break
-            except Exception as cookie_err:
-                print(f"❌ Error buscando cookies internas: {cookie_err}", flush=True)
+                if secret: break
 
         # 4. Verificación final
         if not secret:
-             raise Exception("No se pudo recuperar el token de sesión ni del body ni de las cookies.")
+             print("❌ FATAL: No se encontró el secret en ningún lado.", flush=True)
+             raise Exception("Error de autenticación: No se recibió el token de sesión.")
 
-        # 5. Crear respuesta
+        # 5. Respuesta exitosa
         response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-        
         response.set_cookie(
             key=COOKIE_NAME, 
             value=secret,
@@ -142,7 +163,7 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
         return response
 
     except Exception as e:
-        print(f"❌ Login Error Final: {e}", flush=True)
+        print(f"❌ Login Exception: {e}", flush=True)
         return templates.TemplateResponse("auth.html", {"request": request, "error": f"Error: {str(e)}"})
 
 @app.post("/register", response_class=HTMLResponse)
