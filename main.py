@@ -97,56 +97,41 @@ async def home(request: Request):
 
 @app.post("/login", response_class=HTMLResponse)
 async def login(request: Request, email: str = Form(...), password: str = Form(...)):
-    print("⚡ NUEVO CODIGO CARGADO: Intentando login manual...", flush=True)
-
     try:
-        # Construimos la URL de la API manualmente para saltarnos el SDK
-        # El endpoint estándar es /account/sessions/email
+        # 1. Preparar la petición directa a Appwrite (Bypass del SDK)
         url = f"{APPWRITE_ENDPOINT}/account/sessions/email"
-        
-        # Cabeceras necesarias
         headers = {
             "X-Appwrite-Project": APPWRITE_PROJECT_ID,
             "Content-Type": "application/json"
         }
-        
-        # Datos
-        payload = {
-            "email": email,
-            "password": password
-        }
+        payload = {"email": email, "password": password}
 
-        print(f"📡 Enviando POST a: {url}", flush=True)
-
-        # Hacemos la petición directa sin usar el SDK
+        # 2. Ejecutar login
         response = requests.post(url, json=payload, headers=headers)
 
-        # Verificar error de credenciales
+        # 3. Validar errores (credenciales incorrectas, etc.)
         if response.status_code >= 400:
-            print(f"❌ Error Appwrite ({response.status_code}): {response.text}", flush=True)
+            # Opcional: imprimir error en consola del servidor por si acaso
+            print(f"Login fallido: {response.text}") 
             return templates.TemplateResponse("auth.html", {"request": request, "error": "Email o contraseña incorrectos"})
 
-        # 1. Buscar secret en JSON
+        # 4. Extraer el secret (Prioridad: Cookie > JSON)
         data = response.json()
         secret = data.get('secret')
-        print(f"📦 Intento JSON: {secret}", flush=True)
 
-        # 2. Buscar secret en Cookies (Si JSON falló)
+        # Si no viene en el JSON, lo buscamos en las cookies (El caso que nos funcionó)
         if not secret:
-            print("⚠️ JSON vacío, buscando en cookies de la respuesta...", flush=True)
             for cookie in response.cookies:
                 if cookie.name.startswith('a_session_'):
                     secret = cookie.value
-                    print(f"✅ ¡SECRET ENCONTRADO EN COOKIE!: {secret[:10]}...", flush=True)
                     break
         
         if not secret:
-            raise Exception("No se recibió secret ni por JSON ni por Cookie")
+            raise Exception("Error de autenticación: No se pudo obtener la sesión.")
 
-        # Redirección
-        resp_redirect = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-        
-        resp_redirect.set_cookie(
+        # 5. Redireccionar al Dashboard con la cookie segura
+        resp = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+        resp.set_cookie(
             key=COOKIE_NAME, 
             value=secret,
             httponly=True, 
@@ -154,11 +139,11 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
             secure=True, 
             path="/"
         )
-        return resp_redirect
+        return resp
 
     except Exception as e:
-        print(f"❌ Error Fatal Login: {e}", flush=True)
-        return templates.TemplateResponse("auth.html", {"request": request, "error": f"Error del sistema: {str(e)}"})
+        print(f"Error interno en login: {e}")
+        return templates.TemplateResponse("auth.html", {"request": request, "error": "Error interno del sistema"})
 
 @app.post("/register", response_class=HTMLResponse)
 async def register(request: Request, email: str = Form(...), password: str = Form(...)):
